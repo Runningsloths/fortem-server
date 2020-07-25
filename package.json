@@ -1,0 +1,22 @@
+{
+  "name": "fortem-server",
+  "version": "1.0.0",
+  "description": "Bringing doctors to patients",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Runningsloths/fortem-server.git"
+  },
+  "author": "Tony Yeon",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Runningsloths/fortem-server/issues"
+  },
+  "homepage": "https://github.com/Runningsloths/fortem-server#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
