@@ -1,5 +1,32 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const { OPEN_CREATE } = require('sqlite3');
+const sqlite3 = require('sqlite3').verbose();
+
+const DB_PATH = path.resolve(__dirname, "test.sqlite");
+
+let db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    return console.error(err.message);
+  }
+  console.log("connected to sqlite db");
+});
+
+db.serialize((err) => {
+  if (err) {
+    return console.error(err);
+  }
+  db.run("CREATE TABLE test(info TEXT)");
+  db.run("INSERT INTO test (info) VALUES ('info1')");
+})
+
+db.close((err) => {
+  if (err) {
+    return console.error(err.message);
+  }
+  console.log("close db connection");
+});
 
 let accounts = {
   1: {
