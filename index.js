@@ -48,20 +48,27 @@ app.use(express.urlencoded({ extended: true }));
 app.post('/addAccount', (req, res) => {
   const id = uuidv4();
 
+  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+    if (err) {
+      console.log("bcrypt error");
+      res.status(500).end("Internal Server Error");
+      return;
+    }
     const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, phone) VALUES (?, ?, ?, ?, ?)");
-    stmt.run([ id, req.body.name, req.body.password, req.body.email, req.body.phone ], (err) => {
+    stmt.run([ id, req.body.name, hash, req.body.email, req.body.phone ], (err) => {
       if (err) {
         if (err.message.includes("accounts.email"))
           res.status(422).end("This email already exists.");
         else if (err.message.includes("accounts.phone"))
           res.status(422).end("This phone number already exists.");
-        else
+        else 
           res.status(500).end("Internal Server Error");
       }
       else {
         res.status(200).end("Success");
       }
     });
+  });
 });
 
 app.post('/addDoctor', (req, res) => {
