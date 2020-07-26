@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-const DB_PATH = path.resolve(__dirname, "accounts.db");
+const DB_PATH = path.resolve(__dirname, "info.db");
 
 let db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -21,75 +21,60 @@ db.serialize(() => {
     jobTitle TEXT NOT NULL,
     phone TEXT NOT NULL UNIQUE
     )`);
+  db.run(`CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    sender TEXT NOT NULL,
+    receiver TEXT NOT NULL,
+    timestamp INTEGER NOT NULL
+    )`)
 });
-
-let accounts = {
-  1: {
-    id: '1',
-    name: 'John',
-    password: 'pass',
-    email: 'rart@gmail.com',
-    jobTitle: 'physician',
-    phone: '8186969696'
-  }
-};
-
-let messages = {
-  1: {
-    id: '1',
-    text: 'test',
-  },
-};
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.post('/message', (req, res) => {
+app.post('/addAccount', (req, res) => {
   const id = uuidv4();
+
+    const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, jobTitle, phone) VALUES (?, ?, ?, ?, ? ,?)");
+    stmt.run([ id, req.body.name, req.body.password, req.body.email, req.body.jobTitle, req.body.phone ], (err) => {
+      if (err.message.includes("accounts.phone"))
+        res.status(422).end("This email already exists.");
+      if (err.message.includes("accounts.email"))
+        res.status(422).end("This phone number already exists.");
+    });
+    
+    res.status(200).end("Success");
+});
+
+app.post('/addmessage', (req, res) => {
+  const id = uuidv4();
+
   const message = {
     id: id,
-    text: req.body.text,
+    content: req.body.content,
+    sender: req.body.sender,
+    receiver: req.body.receiver,
+    timestamp: req.body.timestamp,
   };
 
-  messages[id] = message;
+  const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
+  stmt.run([ id, message.content, message.sender, message.receiver, message.timestamp ], (err) => {
+
+  });
+
   return res.send(message);
 });
 
-app.post('/addAccount', (req, res) => {
-  const id = uuidv4();
-  for (const account of Object.values(accounts)) {
-    if (req.body.email.toUpperCase() == account.email.toUpperCase())
-      return res.status(409).end("Account with this email already exists");
-    if (!req.body.email.includes('@') || !req.body.email.includes('.'))
-      return res.status(422).end("Invalid email address");
-    if (req.body.phone.length != 10)
-      return res.status(422).end("Invalid phone number");
-  }
-  const account = {
-    id: id,
-    name: req.body.name,
-    password: req.body.password,
-    email: req.body.email,
-    jobTitle: req.body.jobTitle,
-    phone: req.body.phone,
-  };
-
-  const stmt = db.prepare('INSERT INTO accounts (id, name, password, email, jobTitle, phone) VALUES (?, ?, ?, ?, ? ,?)');
-  console.log([ id, account.name, account.password, account.email, account.jobTitle, account.phone ]);
-  stmt.run(id, account.name, account.password, account.email, account.jobTitle, account.phone);
-  
-  return res.send(account);
-});
-
-process.on('exit', () => {
-  db.close((err) => {
-    if (err) {
-      return console.error(err.message);
-    }
-    console.log("close db connection");
-  });
-});
+// process.on('exit', () => {
+//   db.close((err) => {
+//     if (err) {
+//       return console.error(err.message);
+//     }
+//     console.log("close db connection");
+//   });
+// });
 
 app.listen(3000, () => console.log('Server running on port 3000'));
