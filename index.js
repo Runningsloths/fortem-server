@@ -4,7 +4,7 @@ const path = require('path');
 const { OPEN_CREATE } = require('sqlite3');
 const sqlite3 = require('sqlite3').verbose();
 
-const DB_PATH = path.resolve(__dirname, "test.sqlite");
+const DB_PATH = path.resolve(__dirname, "accounts.db");
 
 let db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -13,13 +13,16 @@ let db = new sqlite3.Database(DB_PATH, (err) => {
   console.log("connected to sqlite db");
 });
 
-db.serialize((err) => {
-  if (err) {
-    return console.error(err);
-  }
-  db.run("CREATE TABLE test(info TEXT)");
-  db.run("INSERT INTO test (info) VALUES ('info1')");
-})
+db.serialize(() => {
+  db.run(`CREATE TABLE accounts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    password TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    jobTitle TEXT NOT NULL,
+    phone TEXT NOT NULL UNIQUE
+    )`);
+});
 
 db.close((err) => {
   if (err) {
@@ -35,6 +38,7 @@ let accounts = {
     password: 'pass',
     email: 'rart@gmail.com',
     jobTitle: 'physician',
+    phone: '8186969696'
   }
 }
 
@@ -78,6 +82,7 @@ app.post('/account', (req, res) => {
     password: req.body.password,
     email: req.body.email,
     jobTitle: req.body.jobTitle,
+    phone: req.body.phone,
   };
 
   accounts[id] = account;
