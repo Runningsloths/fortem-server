@@ -18,7 +18,6 @@ db.serialize(() => {
     name TEXT NOT NULL,
     password TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    jobTitle TEXT NOT NULL,
     phone TEXT NOT NULL UNIQUE
     )`);
   db.run(`CREATE TABLE IF NOT EXISTS messages (
@@ -38,8 +37,8 @@ app.use(express.urlencoded({ extended: true }));
 app.post('/addAccount', (req, res) => {
   const id = uuidv4();
 
-    const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, jobTitle, phone) VALUES (?, ?, ?, ?, ? ,?)");
-    stmt.run([ id, req.body.name, req.body.password, req.body.email, req.body.jobTitle, req.body.phone ], (err) => {
+    const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, phone) VALUES (?, ?, ?, ?, ? ,?)");
+    stmt.run([ id, req.body.name, req.body.password, req.body.email, req.body.phone ], (err) => {
       if (err.message.includes("accounts.phone"))
         res.status(422).end("This email already exists.");
       if (err.message.includes("accounts.email"))
@@ -58,13 +57,13 @@ app.post('/addmessage', (req, res) => {
   res.status(200).end("Success");
 });
 
-// process.on('exit', () => {
-//   db.close((err) => {
-//     if (err) {
-//       return console.error(err.message);
-//     }
-//     console.log("close db connection");
-//   });
-// });
+process.on('exit', () => {
+  db.close((err) => {
+    if (err) {
+      return console.error(err.message);
+    }
+    console.log("close db connection");
+  });
+});
 
 app.listen(3000, () => console.log('Server running on port 3000'));
