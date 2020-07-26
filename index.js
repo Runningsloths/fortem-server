@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 
 const DB_PATH = path.resolve(__dirname, "info.db");
 const saltRounds = 10;
-const JWT_SECRET = process.env.token;
+const JWT_SECRET = process.env.TOKEN;
 
 let db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -49,18 +49,18 @@ app.use(express.urlencoded({ extended: true }));
 const authJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      jwt.verify(token, JWT_SECRET, (err, user) => {
-          if (err) {
-              console.log("jwt error");
-              return res.status(500).end("Internal Server Error");
-          }
-          req.user = user;
-          next();
-      });
-  } 
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            console.log("jwt error");
+            return res.status(500).end("Internal Server Error");
+        }
+        req.user = user;
+        next();
+    });
+  }
   else {
-      res.status(401).end("Unauthorized");
+    res.status(401).end("Unauthorized");
   }
 };
 
