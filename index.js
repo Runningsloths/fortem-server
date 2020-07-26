@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 
 const DB_PATH = path.resolve(__dirname, "info.db");
 const saltRounds = 10;
+const JWT_SECRET = process.env.token;
 
 let db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -44,6 +45,24 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const authJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      jwt.verify(token, JWT_SECRET, (err, user) => {
+          if (err) {
+              console.log("jwt error");
+              return res.status(500).end("Internal Server Error");
+          }
+          req.user = user;
+          next();
+      });
+  } 
+  else {
+      res.status(401).end("Unauthorized");
+  }
+};
 
 app.post('/addAccount', (req, res) => {
   const id = uuidv4();
@@ -87,7 +106,7 @@ app.post('/addDoctor', (req, res) => {
     res.status(200).end("Success");
 });
 
-app.post('/addmessage', (req, res) => {
+app.post('/addMessage', authJWT, (req, res) => {
   const id = uuidv4();
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
