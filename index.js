@@ -52,20 +52,10 @@ app.post('/addAccount', (req, res) => {
 app.post('/addmessage', (req, res) => {
   const id = uuidv4();
 
-  const message = {
-    id: id,
-    content: req.body.content,
-    sender: req.body.sender,
-    receiver: req.body.receiver,
-    timestamp: req.body.timestamp,
-  };
-
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
-  stmt.run([ id, message.content, message.sender, message.receiver, message.timestamp ], (err) => {
+  stmt.run([ id, req.body.content, req.body.sender, req.body.receiver, req.body.timestamp ]);
 
-  });
-
-  return res.send(message);
+  res.status(200).end("Success");
 });
 
 // process.on('exit', () => {
