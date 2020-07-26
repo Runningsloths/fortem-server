@@ -23,13 +23,6 @@ db.serialize(() => {
     )`);
 });
 
-// db.close((err) => {
-//   if (err) {
-//     return console.error(err.message);
-//   }
-//   console.log("close db connection");
-// });
-
 let accounts = {
   1: {
     id: '1',
@@ -90,5 +83,13 @@ app.post('/addAccount', (req, res) => {
   return res.send(account);
 });
 
+process.on('exit', () => {
+  db.close((err) => {
+    if (err) {
+      return console.error(err.message);
+    }
+    console.log("close db connection");
+  });
+});
 
 app.listen(3000, () => console.log('Server running on port 3000'));
