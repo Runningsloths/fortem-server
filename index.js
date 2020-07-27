@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const DB_PATH = path.resolve(__dirname, "info.db");
 const saltRounds = 10;
@@ -52,8 +53,10 @@ const authJWT = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            console.log("jwt error");
-            return res.status(500).end("Internal Server Error");
+            console.log("jwt error\n");
+            console.log(err);
+            res.status(401).end("Unauthorized");
+            return;
         }
         req.user = user;
         next();
@@ -110,9 +113,40 @@ app.post('/addMessage', authJWT, (req, res) => {
   const id = uuidv4();
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
-  stmt.run([ id, req.body.content, req.body.sender, req.body.receiver, req.body.timestamp ]);
+  stmt.run([ id, req.body.content, req.user.id, req.body.receiver ], (err) => {
+    if (err)
+      console.log(err);
+  });
 
   res.status(200).end("Success");
+});
+
+app.post('/userLogin', (req, res) => {
+  const stmt = db.prepare("SELECT id, password FROM accounts WHERE email = (?)");
+  stmt.get([ req.body.email ], (err, row) => {
+    if (err) {
+      res.status(500).end("Internal Server Error");
+      throw err;
+    }
+    else if (!row.password) {
+      res.status(400).end("Invalid login - Please try again.");
+    }
+    else {
+      hash = row.password;
+      bcrypt.compare(req.body.password, hash, (err, result) => {
+        if (err) {
+          throw err;
+        }
+        if (result) {
+          console.log("\nSUCCESS\n");
+          const authToken = jwt.sign({ id: row.id, email: row.email }, JWT_SECRET);
+          res.status(200).end(JSON.stringify({ authToken }));
+        }
+        else
+          res.status(422).end("Invalid login - Please try again.");
+      });
+    }
+  });
 });
 
 process.on('exit', () => {
