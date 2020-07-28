@@ -48,6 +48,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  for (let key in req.body)
+    if (req.body[key])
+      req.body[key] = String(req.body[key]).trim()
+  next();
+});
+
 const authJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
@@ -72,9 +79,9 @@ app.post('/addAccount', (req, res) => {
   const id = uuidv4();
 
   if (
-    req.body.name.length === 0 ||
-    req.body.email.length === 0 ||
-    req.body.phone.length === 0
+    !req.body.name ||
+    !req.body.email ||
+    !req.body.phone
   ) {
     res.status(422).end("Invalid POST body");
     return;
@@ -87,7 +94,13 @@ app.post('/addAccount', (req, res) => {
       return;
     }
     const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, phone) VALUES (?, ?, ?, ?, ?)");
-    stmt.run([ id, req.body.name, hash, req.body.email, req.body.phone ], (err) => {
+    stmt.run([
+      id,
+      req.body.name,
+      hash,
+      req.body.email,
+      req.body.phone
+    ], (err) => {
       if (err) {
         if (err.message.includes("accounts.email"))
           res.status(422).end("This email already exists.");
@@ -105,15 +118,13 @@ app.post('/addAccount', (req, res) => {
 });
 
 app.post('/addDoctor', (req, res) => {
-  const id = uuidv4();
-
   if (
-    req.body.jobTitle.length === 0 ||
-    req.body.latitude.length === 0 ||
-    req.body.longitude.length === 0 ||
-    req.body.isAvailable.length === 0 ||
-    req.body.email.length === 0 ||
-    req.body.phone.length === 0 ||
+    !req.body.jobTitle ||
+    !req.body.latitude ||
+    !req.body.longitude ||
+    !req.body.isAvailable ||
+    !req.body.email ||
+    !req.body.phone ||
     !parseFloat(req.body.latitude) ||
     !parseFloat(req.body.longitude) ||
     !(req.body.isAvailable === 'true' || req.body.isAvailable === 'false')
@@ -122,8 +133,18 @@ app.post('/addDoctor', (req, res) => {
     return;
   }
 
+  const id = uuidv4();
+
   const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?)");
-  stmt.run([ id, req.body.jobTitle, parseFloat(req.body.latitude), parseFloat(req.body.longitude), req.body.isAvailable === 'true', req.body.email, req.body.phone ], (err) => {
+  stmt.run([
+    id,
+    req.body.jobTitle,
+    parseFloat(req.body.latitude),
+    parseFloat(req.body.longitude),
+    req.body.isAvailable === 'true',
+    req.body.email,
+    req.body.phone
+  ], (err) => {
     if (err) {
       if (err.message.includes("accounts.email"))
         res.status(422).end("This email already exists.");
@@ -140,14 +161,16 @@ app.post('/addDoctor', (req, res) => {
 
 app.post('/getDoctor', authJWT, (req, res) => {
   if (
-    req.body.id.length === 0
+    !req.body.id
   ) {
     res.status(422).end("Invalid POST body");
     return;
   }
 
   const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors WHERE id = ?");
-  stmt.get([ req.body.id ], (err, row) => {
+  stmt.get([
+      req.body.id.trim()
+  ], (err, row) => {
     if (err) res.status(500).end("Internal Server Error");
     else if (row) {
       res.status(200).end(JSON.stringify(row));
@@ -160,9 +183,9 @@ app.post('/getDoctor', authJWT, (req, res) => {
 
 app.post('/getDoctorsNearMe', authJWT, (req, res) => {
   if (
-    req.body.latitude.length === 0 ||
-    req.body.longitude.length === 0 ||
-    req.body.distance.length === 0 ||
+    !req.body.latitude ||
+    !req.body.longitude ||
+    !req.body.distance ||
     !parseFloat(req.body.latitude) ||
     !parseFloat(req.body.longitude) ||
     !parseInt(req.body.distance)
@@ -193,14 +216,17 @@ app.post('/getDoctorsNearMe', authJWT, (req, res) => {
 
 app.post('/getConversation', authJWT, (req, res) => {
   if (
-    req.body.id.length === 0
+    !req.body.id
   ) {
     res.status(422).end("Invalid POST body");
     return;
   }
 
   const stmt = db.prepare("SELECT sender, receiver FROM messages WHERE sender = ? OR receiver = ?");
-  stmt.all([ req.user.id, req.user.id ], (err, rows) => {
+  stmt.all([
+    req.user.id,
+    req.user.id
+  ], (err, rows) => {
     if (err) res.status(500).end("Internal Server Error");
     else if (rows) {
       const conversations = [ ...new Set(rows.map(row => (req.user.id === row.sender ? row.receiver : row.sender))) ];
@@ -211,8 +237,8 @@ app.post('/getConversation', authJWT, (req, res) => {
 
 app.post('/sendMessage', authJWT, (req, res) => {
   if (
-    req.body.content.length === 0 ||
-    req.body.receiver.length === 0
+    !req.body.content ||
+    !req.body.receiver
   ) {
     res.status(422).end("Invalid POST body");
     return;
@@ -221,7 +247,12 @@ app.post('/sendMessage', authJWT, (req, res) => {
   const id = uuidv4();
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
-  stmt.run([ id, req.body.content, req.user.id, req.body.receiver ], (err) => {
+  stmt.run([
+    id,
+    req.body.content,
+    req.user.id,
+    req.body.receiver
+  ], (err) => {
     if (err) res.status(500).end("Internal Server Error");
     else res.status(200).end("Success");
   });
@@ -229,14 +260,19 @@ app.post('/sendMessage', authJWT, (req, res) => {
 
 app.post('/getMessage', authJWT, (req, res) => {
   if (
-    req.body.participant.length === 0
+    !req.body.participant
   ) {
     res.status(422).end("Invalid POST body");
     return;
   }
 
   const stmt = db.prepare("SELECT id, content, sender, receiver, timestamp FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) ORDER BY timestamp DESC");
-  stmt.all([req.user.id, req.body.participant, req.body.participant, req.user.id ], (err, rows) => {
+  stmt.all([
+    req.user.id,
+    req.body.participant,
+    req.body.participant,
+    req.user.id
+  ], (err, rows) => {
     if (err) res.status(500).end("Internal Server Error");
     else if (rows) {
       res.status(200).end(JSON.stringify(rows));
@@ -249,17 +285,21 @@ app.post('/getMessage', authJWT, (req, res) => {
 
 app.post('/userLogin', (req, res) => {
   if (
-    req.body.email.length === 0 ||
-    req.body.password.length === 0
+    !req.body.email ||
+    !req.body.password
   ) {
     res.status(422).end("Invalid POST body");
     return;
   }
 
   const stmt = db.prepare("SELECT id, password FROM accounts WHERE email = (?)");
-  stmt.get([ req.body.email ], (err, row) => {
-    if (err) res.status(500).end("Internal Server Error");
-    else if (!row.password) {
+  stmt.get([
+    req.body.email
+  ], (err, row) => {
+    if (err) {
+      res.status(500).end("Internal Server Error");
+    }
+    if (!row) {
       res.status(400).end("Incorrect email or password");
     }
     else {
