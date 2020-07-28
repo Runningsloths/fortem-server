@@ -140,7 +140,7 @@ app.post('/addDoctor', (req, res) => {
 
 app.post('/getDoctor', authJWT, (req, res) => {
   if (
-    req.body.id.length === 0 ||
+    req.body.id.length === 0
   ) {
     res.status(422).end("Invalid POST body");
     return;
