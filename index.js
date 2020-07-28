@@ -4,6 +4,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { statSync } = require('fs');
 
 const DB_PATH = path.resolve(__dirname, "info.db");
 const saltRounds = 10;
@@ -109,7 +110,35 @@ app.post('/addDoctor', (req, res) => {
     res.status(200).end("Success");
 });
 
-app.post('/addMessage', authJWT, (req, res) => {
+app.post('/getDoctor', authJWT, (req, res) => {
+  const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors WHERE id = ?");
+  stmt.get([ req.body.id ], (err, row) => {
+    console.log(row);
+    if (err) {
+      res.status(500).end("Internal Server Error");
+      console.warn(err);
+    }
+    else if (row) {
+      res.status(200).end(JSON.stringify(row));
+    }
+    else {
+      res.status(422).end("Doctor ID Not Found");
+    }
+  });
+});
+
+app.post('/getConversation', authJWT, (req, res) => {
+  const stmt = db.prepare("SELECT sender, receiver FROM messages WHERE sender = ? OR receiver = ?");
+  stmt.all([ req.user.id, req.user.id ], (err, rows) => {
+    if (err) console.warn(err);
+    else if (rows) {
+      const conversations = [ ...new Set(rows.map(row => (req.user.id === row.sender ? row.receiver : row.sender))) ];
+      res.status(200).end(JSON.stringify(conversations));
+    }
+  });
+});
+
+app.post('/sendMessage', authJWT, (req, res) => {
   const id = uuidv4();
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
@@ -117,9 +146,24 @@ app.post('/addMessage', authJWT, (req, res) => {
     if (err)
       console.log(err);
   });
-
   res.status(200).end("Success");
-});
+}); 
+
+app.post('/getMessage', authJWT, (req, res) => {
+  const stmt = db.prepare("SELECT id, content, sender, receiver, timestamp FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) ORDER BY timestamp DESC");
+  stmt.all([req.user.id, req.body.participant, req.body.participant, req.user.id ], (err, rows) => {
+    if (err) {
+      res.status(500).end("Internal Server Error");
+      console.warn(err);
+    }
+    else if (rows) {
+      res.status(200).end(JSON.stringify(rows));
+    }
+    else {
+      res.status(404).end("Message Not Found");
+    }
+  });
+})
 
 app.post('/userLogin', (req, res) => {
   const stmt = db.prepare("SELECT id, password FROM accounts WHERE email = (?)");
@@ -138,7 +182,7 @@ app.post('/userLogin', (req, res) => {
           throw err;
         }
         if (result) {
-          console.log("\nSUCCESS\n");
+          console.log("\nsuccessful user login\n");
           const authToken = jwt.sign({ id: row.id, email: row.email }, JWT_SECRET);
           res.status(200).end(JSON.stringify({ authToken }));
         }
