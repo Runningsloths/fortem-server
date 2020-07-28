@@ -23,11 +23,15 @@ db.serialize(() => {
     name TEXT NOT NULL,
     password TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    phone TEXT NOT NULL UNIQUE
+    phone TEXT NOT NULL UNIQUE,
+    gender TEXT NOT NULL,
+    dob INTEGER NOT NULL,
+    profile TEXT NOT NULL
     )`);
   db.run(`CREATE TABLE IF NOT EXISTS doctors (
     id TEXT PRIMARY KEY,
     jobTitle TEXT NOT NULL,
+    description TEXT NOT NULL,
     latitude REAL NOT NULL,
     longitude REAL NOT NULL,
     isAvailable BOOLEAN NOT NULL,
@@ -81,7 +85,13 @@ app.post('/addAccount', (req, res) => {
   if (
     !req.body.name ||
     !req.body.email ||
-    !req.body.phone
+    !req.body.phone ||
+    !req.body.password ||
+    !req.body.gender ||
+    !req.body.dob ||
+    !(req.body.gender === 'male' || req.body.gender === 'female' || req.body.gender ==='other') ||
+    !parseInt(req.body.dob) ||
+    !req.body.profile
   ) {
     res.status(422).end("Invalid POST body");
     return;
@@ -93,13 +103,16 @@ app.post('/addAccount', (req, res) => {
       res.status(500).end("Internal Server Error");
       return;
     }
-    const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, phone) VALUES (?, ?, ?, ?, ?)");
+    const stmt = db.prepare("INSERT INTO accounts (id, name, password, email, phone, gender, dob, profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     stmt.run([
       id,
       req.body.name,
       hash,
       req.body.email,
-      req.body.phone
+      req.body.phone,
+      req.body.gender,
+      req.body.dob,
+      req.body.profile
     ], (err) => {
       if (err) {
         if (err.message.includes("accounts.email"))
@@ -120,6 +133,7 @@ app.post('/addAccount', (req, res) => {
 app.post('/addDoctor', (req, res) => {
   if (
     !req.body.jobTitle ||
+    !req.body.description ||
     !req.body.latitude ||
     !req.body.longitude ||
     !req.body.isAvailable ||
@@ -135,10 +149,11 @@ app.post('/addDoctor', (req, res) => {
 
   const id = uuidv4();
 
-  const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?)");
+  const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, description, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?, ?)");
   stmt.run([
     id,
     req.body.jobTitle,
+    req.body.description,
     parseFloat(req.body.latitude),
     parseFloat(req.body.longitude),
     req.body.isAvailable === 'true',
