@@ -4,7 +4,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { statSync } = require('fs');
+const geolib = require('geolib');
 
 const DB_PATH = path.resolve(__dirname, "info.db");
 const saltRounds = 10;
@@ -28,8 +28,8 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS doctors (
     id TEXT PRIMARY KEY,
     jobTitle TEXT NOT NULL,
-    latitude INTEGER NOT NULL,
-    longitude INTEGER NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
     isAvailable BOOLEAN NOT NULL,
     email TEXT NOT NULL UNIQUE,
     phone TEXT NOT NULL UNIQUE
@@ -88,7 +88,8 @@ app.post('/addAccount', (req, res) => {
           res.status(500).end("Internal Server Error");
       }
       else {
-        res.status(200).end("Success");
+        const authToken = jwt.sign({ id, email: req.body.email }, JWT_SECRET);
+        res.status(200).end(JSON.stringify({ authToken }));
       }
     });
   });
@@ -98,7 +99,7 @@ app.post('/addDoctor', (req, res) => {
   const id = uuidv4();
 
     const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?)");
-    stmt.run([ id, req.body.jobTitle, req.body.latitude, req.body.longitude, req.body.isAvailable, req.body.email, req.body.phone ], (err) => {
+    stmt.run([ id, req.body.jobTitle, parseFloat(req.body.latitude), parseFloat(req.body.longitude), req.body.isAvailable, req.body.email, req.body.phone ], (err) => {
       if (err) {
         if (err.message.includes("accounts.email"))
           res.status(422).end("This email already exists.");
@@ -124,6 +125,27 @@ app.post('/getDoctor', authJWT, (req, res) => {
     else {
       res.status(422).end("Doctor ID Not Found");
     }
+  });
+});
+
+app.post('/getDoctorsNearMe', authJWT, (req, res) => {
+  const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors");
+  stmt.all((err, rows) => {
+    if (err) console.log(err);
+    const nearbyDoctors = rows.map((row) => {
+      return { 
+        ...row,
+        distance: geolib.getPreciseDistance(
+          { latitude: parseFloat(req.body.latitude), longitude: parseFloat(req.body.longitude) },
+          { latitude: row.latitude, longitude: row.longitude }
+        ) / 1609.34,
+      }
+    }).filter((row) => {
+      return row.distance < parseInt(req.body.distance);
+    }).sort((a, b) => {
+      return a.distance - b.distance;
+    });
+    res.status(200).end(JSON.stringify(nearbyDoctors));
   });
 });
 
