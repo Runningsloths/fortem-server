@@ -114,11 +114,7 @@ app.post('/addDoctor', (req, res) => {
 app.post('/getDoctor', authJWT, (req, res) => {
   const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors WHERE id = ?");
   stmt.get([ req.body.id ], (err, row) => {
-    console.log(row);
-    if (err) {
-      res.status(500).end("Internal Server Error");
-      console.warn(err);
-    }
+    if (err) res.status(500).end("Internal Server Error");
     else if (row) {
       res.status(200).end(JSON.stringify(row));
     }
@@ -131,7 +127,7 @@ app.post('/getDoctor', authJWT, (req, res) => {
 app.post('/getDoctorsNearMe', authJWT, (req, res) => {
   const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors");
   stmt.all((err, rows) => {
-    if (err) console.log(err);
+    if (err) res.status(500).end("Internal Server Error");
     const nearbyDoctors = rows.map((row) => {
       return { 
         ...row,
@@ -152,7 +148,7 @@ app.post('/getDoctorsNearMe', authJWT, (req, res) => {
 app.post('/getConversation', authJWT, (req, res) => {
   const stmt = db.prepare("SELECT sender, receiver FROM messages WHERE sender = ? OR receiver = ?");
   stmt.all([ req.user.id, req.user.id ], (err, rows) => {
-    if (err) console.warn(err);
+    if (err) res.status(500).end("Internal Server Error");
     else if (rows) {
       const conversations = [ ...new Set(rows.map(row => (req.user.id === row.sender ? row.receiver : row.sender))) ];
       res.status(200).end(JSON.stringify(conversations));
@@ -165,8 +161,7 @@ app.post('/sendMessage', authJWT, (req, res) => {
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
   stmt.run([ id, req.body.content, req.user.id, req.body.receiver ], (err) => {
-    if (err)
-      console.log(err);
+    if (err) res.status(500).end("Internal Server Error");
   });
   res.status(200).end("Success");
 }); 
@@ -174,10 +169,7 @@ app.post('/sendMessage', authJWT, (req, res) => {
 app.post('/getMessage', authJWT, (req, res) => {
   const stmt = db.prepare("SELECT id, content, sender, receiver, timestamp FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) ORDER BY timestamp DESC");
   stmt.all([req.user.id, req.body.participant, req.body.participant, req.user.id ], (err, rows) => {
-    if (err) {
-      res.status(500).end("Internal Server Error");
-      console.warn(err);
-    }
+    if (err) res.status(500).end("Internal Server Error");
     else if (rows) {
       res.status(200).end(JSON.stringify(rows));
     }
@@ -190,10 +182,7 @@ app.post('/getMessage', authJWT, (req, res) => {
 app.post('/userLogin', (req, res) => {
   const stmt = db.prepare("SELECT id, password FROM accounts WHERE email = (?)");
   stmt.get([ req.body.email ], (err, row) => {
-    if (err) {
-      res.status(500).end("Internal Server Error");
-      throw err;
-    }
+    if (err) res.status(500).end("Internal Server Error");
     else if (!row.password) {
       res.status(400).end("Invalid login - Please try again.");
     }
