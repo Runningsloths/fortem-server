@@ -71,6 +71,15 @@ const authJWT = (req, res, next) => {
 app.post('/addAccount', (req, res) => {
   const id = uuidv4();
 
+  if (
+    req.body.name.length === 0 ||
+    req.body.email.length === 0 ||
+    req.body.phone.length === 0
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
     if (err) {
       console.log("bcrypt error");
@@ -98,20 +107,45 @@ app.post('/addAccount', (req, res) => {
 app.post('/addDoctor', (req, res) => {
   const id = uuidv4();
 
-    const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?)");
-    stmt.run([ id, req.body.jobTitle, parseFloat(req.body.latitude), parseFloat(req.body.longitude), req.body.isAvailable, req.body.email, req.body.phone ], (err) => {
-      if (err) {
-        if (err.message.includes("accounts.email"))
-          res.status(422).end("This email already exists.");
-        if (err.message.includes("accounts.phone"))
-          res.status(422).end("This phone number already exists.");
-      }
-    });
-    
-    res.status(200).end("Success");
+  if (
+    req.body.jobTitle.length === 0 ||
+    req.body.latitude.length === 0 ||
+    req.body.longitude.length === 0 ||
+    req.body.isAvailable.length === 0 ||
+    req.body.email.length === 0 ||
+    req.body.phone.length === 0 ||
+    !parseFloat(req.body.latitude) ||
+    !parseFloat(req.body.longitude) ||
+    !(req.body.isAvailable === 'true' || req.body.isAvailable === 'false')
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
+  const stmt = db.prepare("INSERT INTO doctors (id, jobTitle, latitude, longitude, isAvailable, email, phone) VALUES (?, ?, ?, ?, ? ,?, ?)");
+  stmt.run([ id, req.body.jobTitle, parseFloat(req.body.latitude), parseFloat(req.body.longitude), req.body.isAvailable === 'true', req.body.email, req.body.phone ], (err) => {
+    if (err) {
+      if (err.message.includes("accounts.email"))
+        res.status(422).end("This email already exists.");
+      if (err.message.includes("accounts.phone"))
+        res.status(422).end("This phone number already exists.");
+      else
+        res.status(500).end("Internal Server Error");
+    }
+    else {
+      res.status(200).end("Success");
+    }
+  });
 });
 
 app.post('/getDoctor', authJWT, (req, res) => {
+  if (
+    req.body.id.length === 0 ||
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors WHERE id = ?");
   stmt.get([ req.body.id ], (err, row) => {
     if (err) res.status(500).end("Internal Server Error");
@@ -125,6 +159,18 @@ app.post('/getDoctor', authJWT, (req, res) => {
 });
 
 app.post('/getDoctorsNearMe', authJWT, (req, res) => {
+  if (
+    req.body.latitude.length === 0 ||
+    req.body.longitude.length === 0 ||
+    req.body.distance.length === 0 ||
+    !parseFloat(req.body.latitude) ||
+    !parseFloat(req.body.longitude) ||
+    !parseInt(req.body.distance)
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const stmt = db.prepare("SELECT id, jobTitle, latitude, longitude, isAvailable, email, phone FROM doctors");
   stmt.all((err, rows) => {
     if (err) res.status(500).end("Internal Server Error");
@@ -146,6 +192,13 @@ app.post('/getDoctorsNearMe', authJWT, (req, res) => {
 });
 
 app.post('/getConversation', authJWT, (req, res) => {
+  if (
+    req.body.id.length === 0
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const stmt = db.prepare("SELECT sender, receiver FROM messages WHERE sender = ? OR receiver = ?");
   stmt.all([ req.user.id, req.user.id ], (err, rows) => {
     if (err) res.status(500).end("Internal Server Error");
@@ -157,16 +210,31 @@ app.post('/getConversation', authJWT, (req, res) => {
 });
 
 app.post('/sendMessage', authJWT, (req, res) => {
+  if (
+    req.body.content.length === 0 ||
+    req.body.receiver.length === 0
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const id = uuidv4();
 
   const stmt = db.prepare("INSERT INTO messages (id, content, sender, receiver, timestamp) VALUES (?, ?, ?, ?, strftime('%s', 'now'))");
   stmt.run([ id, req.body.content, req.user.id, req.body.receiver ], (err) => {
     if (err) res.status(500).end("Internal Server Error");
+    else res.status(200).end("Success");
   });
-  res.status(200).end("Success");
 }); 
 
 app.post('/getMessage', authJWT, (req, res) => {
+  if (
+    req.body.participant.length === 0
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const stmt = db.prepare("SELECT id, content, sender, receiver, timestamp FROM messages WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) ORDER BY timestamp DESC");
   stmt.all([req.user.id, req.body.participant, req.body.participant, req.user.id ], (err, rows) => {
     if (err) res.status(500).end("Internal Server Error");
@@ -180,11 +248,19 @@ app.post('/getMessage', authJWT, (req, res) => {
 })
 
 app.post('/userLogin', (req, res) => {
+  if (
+    req.body.email.length === 0 ||
+    req.body.password.length === 0
+  ) {
+    res.status(422).end("Invalid POST body");
+    return;
+  }
+
   const stmt = db.prepare("SELECT id, password FROM accounts WHERE email = (?)");
   stmt.get([ req.body.email ], (err, row) => {
     if (err) res.status(500).end("Internal Server Error");
     else if (!row.password) {
-      res.status(400).end("Invalid login - Please try again.");
+      res.status(400).end("Incorrect email or password");
     }
     else {
       hash = row.password;
@@ -193,12 +269,11 @@ app.post('/userLogin', (req, res) => {
           throw err;
         }
         if (result) {
-          console.log("\nsuccessful user login\n");
           const authToken = jwt.sign({ id: row.id, email: row.email }, JWT_SECRET);
           res.status(200).end(JSON.stringify({ authToken }));
         }
         else
-          res.status(422).end("Invalid login - Please try again.");
+          res.status(422).end("Incorrect email or password");
       });
     }
   });
