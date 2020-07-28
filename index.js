@@ -49,7 +49,7 @@ db.serialize(() => {
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
@@ -124,13 +124,13 @@ app.post('/addAccount', (req, res) => {
       }
       else {
         const authToken = jwt.sign({ id, email: req.body.email }, JWT_SECRET);
-        res.status(200).end(JSON.stringify({ authToken }));
+        res.status(200).end(JSON.stringify({ id, authToken }));
       }
     });
   });
 });
 
-app.post('/addDoctor', (req, res) => {
+/*app.post('/addDoctor', (req, res) => {
   if (
     !req.body.jobTitle ||
     !req.body.description ||
@@ -172,7 +172,7 @@ app.post('/addDoctor', (req, res) => {
       res.status(200).end("Success");
     }
   });
-});
+});*/
 
 app.post('/getDoctor', authJWT, (req, res) => {
   if (
@@ -325,7 +325,7 @@ app.post('/userLogin', (req, res) => {
         }
         if (result) {
           const authToken = jwt.sign({ id: row.id, email: row.email }, JWT_SECRET);
-          res.status(200).end(JSON.stringify({ authToken }));
+          res.status(200).end(JSON.stringify({ id: row.id, authToken }));
         }
         else
           res.status(422).end("Incorrect email or password");
